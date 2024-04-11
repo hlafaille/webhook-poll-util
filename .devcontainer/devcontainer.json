@@ -17,7 +17,11 @@
 					".devcontainer": true,
 					".vscode": true
 				}
-			}
+			},
+			"extensions": [
+				"njpwerner.autodocstring",
+				"KevinRose.vsc-python-indent"
+			]
 		}
 	}
 }
