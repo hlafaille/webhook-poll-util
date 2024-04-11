@@ -1,5 +1,5 @@
+import httpx
 from handler.context import PollResponseContext, JsonWebhookPayloadContext
-
 
 INTERVAL: int = 1000
 
@@ -9,6 +9,11 @@ async def poll() -> PollResponseContext:
     Returns:
         bool: True if healthy, false if not.
     """
+    url: str = "https://google.com"
+    async with httpx.AsyncClient() as c:
+        response = await c.get(url)
+    print(response.text)
+    
     return PollResponseContext(True)
 
 

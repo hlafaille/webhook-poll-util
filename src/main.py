@@ -22,8 +22,12 @@ async def main():
     for task in tasks: # type: ignore
         configured_handlers.append(task.result()) # type: ignore
     
+    # enter the server loop
     while True:
-        pass
+        # iterate over handlers, determine which ones need re-polling.
+        for handler in configured_handlers:
+            
+            
 
 
 if __name__ == "__main__":
