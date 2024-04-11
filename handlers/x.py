@@ -12,7 +12,7 @@ async def poll() -> PollResponseContext:
     return PollResponseContext(True)
 
 
-async def build_webhook_context(ctx: PollResponseContext) -> JsonWebhookPayloadContext:
+async def build_webhook_context(ctx: PollResponseContext) -> JsonWebhookPayloadContext | None:
     """Build the payload for your webhook HTTP request here.
 
     Args:
@@ -24,4 +24,8 @@ async def build_webhook_context(ctx: PollResponseContext) -> JsonWebhookPayloadC
     Todo:
         Add support for an `XmlWebhookPayloadContext`
     """
-    return JsonWebhookPayloadContext({"": ""})
+    # don't send the webhook if the service is healthy
+    if ctx.is_healthy:
+        return
+    
+    return JsonWebhookPayloadContext({"message": "not healthy"})
