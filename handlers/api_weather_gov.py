@@ -1,7 +1,8 @@
 import httpx
 from handler.context import PollResponseContext, JsonWebhookPayloadContext
 
-INTERVAL: int = 1000
+INTERVAL: int = 5000
+
 
 async def poll() -> PollResponseContext:
     """Poll your service here.
@@ -9,15 +10,17 @@ async def poll() -> PollResponseContext:
     Returns:
         bool: True if healthy, false if not.
     """
-    url: str = "https://google.com"
+    url: str = "https://api.weather.gov"
     async with httpx.AsyncClient() as c:
         response = await c.get(url)
-    print(response.text)
-    
-    return PollResponseContext(True)
+    return PollResponseContext(
+        response.json().get("status") == "OK", "US Government Weather API is healthy."
+    )
 
 
-async def build_webhook_context(ctx: PollResponseContext) -> JsonWebhookPayloadContext | None:
+async def build_webhook_payload_context(
+    ctx: PollResponseContext,
+) -> JsonWebhookPayloadContext | None:
     """Build the payload for your webhook HTTP request here.
 
     Args:
@@ -25,12 +28,12 @@ async def build_webhook_context(ctx: PollResponseContext) -> JsonWebhookPayloadC
 
     Returns:
         JsonWebhookPayloadContext: A `JsonWebhookPayloadContext`, containing information about your payload.
-        
+
     Todo:
         Add support for an `XmlWebhookPayloadContext`
     """
     # don't send the webhook if the service is healthy
     if ctx.is_healthy:
         return
-    
+
     return JsonWebhookPayloadContext({"message": "not healthy"})

@@ -3,7 +3,7 @@ import importlib
 import logging
 from pathlib import Path
 from types import ModuleType
-from typing import Callable
+from typing import Callable, Coroutine
 from exception import HandlerMissingAttributeException
 from handler.context import JsonWebhookPayloadContext, PollResponseContext
 from util import fs, log
@@ -17,9 +17,10 @@ class ConfiguredHandler:
     _log: logging.Logger
     _module: ModuleType
     _interval: int
-    _poll: Callable[[], PollResponseContext]
-    _build_webhook_context: Callable[[PollResponseContext], JsonWebhookPayloadContext]
+    _poll: Callable[[], Coroutine[None, None, PollResponseContext]]
+    _build_webhook_payload_context: Callable[[], JsonWebhookPayloadContext]
     _last_poll: datetime.datetime | None
+    _last_poll_response_context: PollResponseContext | None
 
     def __init__(self, name: str, path: Path, log: logging.Logger) -> None:
         self._name = name
@@ -35,9 +36,7 @@ class ConfiguredHandler:
             path (Path): Filesystem path to the handler
         """
         handler_name = fs.handler_name_from_path(path)
-        instance = cls(
-            handler_name, path, log.get_logger(f"handler:{handler_name}")
-        )
+        instance = cls(handler_name, path, log.get_logger(f"handler:{handler_name}"))
         instance._parse()
         return instance
 
@@ -50,7 +49,7 @@ class ConfiguredHandler:
         try:
             self._interval = self._module.INTERVAL
             self._poll = self._module.poll
-            self._build_webhook_context = self._module.build_webhook_context
+            self._build_webhook_context = self._module.build_webhook_payload_context
         except AttributeError as e:
             raise HandlerMissingAttributeException(
                 handler_name=self._name, attribute_name=e.name
@@ -58,10 +57,28 @@ class ConfiguredHandler:
 
         self._log.info(f"loaded handler")
 
-    def poll(self):
-        """Helper for calling the `poll()` function for this handler."""
-        self._poll()
+    async def do(self):
+        """Polls the handler, handles calling the webhook with the built payload context."""
+        try:
+            self._last_poll_response_context = await self._poll()
+        except Exception as e:
+            self._log.exception(
+                msg="exception occurred within configured handler, setting poll response context to unhealthy",
+                exc_info=e,
+            )
+            self._last_poll_response_context = PollResponseContext(
+                is_healthy=False,
+                pretty_message="Exception occurred during polling of handler",
+            )
         self._last_poll = datetime.datetime.now(datetime.UTC)
+        await self.handle_poll_response()
+
+    async def handle_poll_response(self):
+        """Handle the poll's response. This involves sending the webhook call.
+
+        Args:
+            poll_response (PollResponseContext): _description_
+        """
 
     def needs_polling(self) -> bool:
         """If this handler is ready for polling again. This checks for if
@@ -70,7 +87,10 @@ class ConfiguredHandler:
         Returns:
             bool: True if ready for polling, False if not.
         """
-        if (not self._last_poll) or (datetime.datetime.now() < self._last_poll):
-            return False
-        return True
-        
+        if self._last_poll == None:
+            return True
+        if datetime.datetime.now(datetime.UTC) > self._last_poll + datetime.timedelta(
+            milliseconds=self._interval
+        ):
+            return True
+        return False
