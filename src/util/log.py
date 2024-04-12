@@ -3,7 +3,7 @@ import sys
 
 _LOGGERS: dict[str, logging.Logger] = {}
 
-async def get_logger(name: str) -> logging.Logger:
+def get_logger(name: str) -> logging.Logger:
     """Get a logger by name
 
     Args:

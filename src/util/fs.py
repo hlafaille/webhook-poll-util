@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-async def path_to_import_notation(path: Path) -> tuple[str, str]:
+def path_to_import_notation(path: Path) -> tuple[str, str]:
     """Convert a filesystem path to Python import notation
 
     Args:
@@ -18,7 +18,7 @@ async def path_to_import_notation(path: Path) -> tuple[str, str]:
     
 
 
-async def handler_name_from_path(path: Path) -> str:
+def handler_name_from_path(path: Path) -> str:
     """Get a handlers name from its path
 
     Args:

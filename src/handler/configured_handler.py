@@ -28,23 +28,23 @@ class ConfiguredHandler:
         self._last_poll = None
 
     @classmethod
-    async def build(cls, path: Path) -> "ConfiguredHandler":
-        """Asynchronously construct a `ConfiguredHandler`.
+    def build(cls, path: Path) -> "ConfiguredHandler":
+        """Construct a `ConfiguredHandler`.
 
         Args:
             path (Path): Filesystem path to the handler
         """
-        handler_name = await fs.handler_name_from_path(path)
+        handler_name = fs.handler_name_from_path(path)
         instance = cls(
-            handler_name, path, await log.get_logger(f"handler:{handler_name}")
+            handler_name, path, log.get_logger(f"handler:{handler_name}")
         )
-        await instance._parse()
+        instance._parse()
         return instance
 
-    async def _parse(self) -> None:
+    def _parse(self) -> None:
         """Parse the Python file at _path. This `ConfiguredHandler` will expose method API to interact with the handler."""
         # load the module (must be in PYTHONPATH!)
-        package, module = await fs.path_to_import_notation(self._path)
+        package, module = fs.path_to_import_notation(self._path)
         self._module = importlib.import_module(name=module, package=package)
 
         try:
@@ -58,15 +58,19 @@ class ConfiguredHandler:
 
         self._log.info(f"loaded handler")
 
-    async def poll(self):
+    def poll(self):
         """Helper for calling the `poll()` function for this handler."""
-        await self._poll()
+        self._poll()
         self._last_poll = datetime.datetime.now(datetime.UTC)
 
-    async def is_ready_for_polling(self) -> bool:
+    def needs_polling(self) -> bool:
         """If this handler is ready for polling again. This checks for if
         `last time polled + interval in ms` is `>=` the current time.
 
         Returns:
             bool: True if ready for polling, False if not.
         """
+        if (not self._last_poll) or (datetime.datetime.now() < self._last_poll):
+            return False
+        return True
+        

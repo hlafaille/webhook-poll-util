@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 
-async def get_handler_paths() -> list[Path]:
+def get_handler_paths() -> list[Path]:
     """Get a list of `Path` objects pointing to the handlers. Todo, add directory recursion.
 
     Returns:
