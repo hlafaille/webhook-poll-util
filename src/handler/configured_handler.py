@@ -4,6 +4,8 @@ import logging
 from pathlib import Path
 from types import ModuleType
 from typing import Callable, Coroutine
+
+import httpx
 from exception import HandlerMissingAttributeException
 from handler.context import JsonWebhookPayloadContext, PollResponseContext
 from util import fs, log
@@ -18,7 +20,8 @@ class ConfiguredHandler:
     _module: ModuleType
     _interval: int
     _poll: Callable[[], Coroutine[None, None, PollResponseContext]]
-    _build_webhook_payload_context: Callable[[], JsonWebhookPayloadContext]
+    _webhook_url: str
+    _build_webhook_payload_context: Callable[[], Coroutine[None, None, JsonWebhookPayloadContext]]
     _last_poll: datetime.datetime | None
     _last_poll_response_context: PollResponseContext | None
 
@@ -49,7 +52,10 @@ class ConfiguredHandler:
         try:
             self._interval = self._module.INTERVAL
             self._poll = self._module.poll
-            self._build_webhook_context = self._module.build_webhook_payload_context
+            self._build_webhook_payload_context = (
+                self._module.build_webhook_payload_context
+            )
+            self._webhook_url = self._module.WEBHOOK_URL
         except AttributeError as e:
             raise HandlerMissingAttributeException(
                 handler_name=self._name, attribute_name=e.name
@@ -59,26 +65,44 @@ class ConfiguredHandler:
 
     async def do(self):
         """Polls the handler, handles calling the webhook with the built payload context."""
+        # poll
         try:
             self._last_poll_response_context = await self._poll()
         except Exception as e:
             self._log.exception(
-                msg="exception occurred within configured handler, setting poll response context to unhealthy",
+                msg="exception occurred while calling handler's poll function, setting poll response context to unhealthy",
                 exc_info=e,
             )
             self._last_poll_response_context = PollResponseContext(
                 is_healthy=False,
-                pretty_message="Exception occurred during polling of handler",
+                pretty_message="Error occurred during polling of handler",
             )
-        self._last_poll = datetime.datetime.now(datetime.UTC)
-        await self.handle_poll_response()
 
-    async def handle_poll_response(self):
-        """Handle the poll's response. This involves sending the webhook call.
+        # set our last poll time to utc now
+        self._last_poll = datetime.datetime.now(datetime.UTC)
+
+        # deal with our poll response
+        try:
+            await self._call_webhook()
+        except Exception as e:
+            self._log.exception(
+                msg="exception occurred while calling the handlers webhook, please investigate!"
+            )
+
+    async def _call_webhook(self):
+        """Handle the poll's response. This involves getting our request payload and sending the webhook call.
+        This method will return out without sending any webhook calls if the `PollResponseContext` indicates
+        healthy.
 
         Args:
             poll_response (PollResponseContext): _description_
         """
+        request_payload: JsonWebhookPayloadContext | None = await self._build_webhook_payload_context(self._last_poll_response_context)  # type: ignore <-- todo remove
+        if not request_payload:
+            return
+        
+        async with httpx.AsyncClient() as c:
+            await c.post(url=self._webhook_url, json=request_payload.payload) # type: ignore
 
     def needs_polling(self) -> bool:
         """If this handler is ready for polling again. This checks for if

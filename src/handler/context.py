@@ -13,7 +13,7 @@ class PollResponseContext:
 
 class JsonWebhookPayloadContext:
     """Represents the request payload of a webhook."""
-    payload: dict[Any, Any]
+    payload: dict[str, str | int | bool | None]
     
     def __init__(self, payload: dict[Any, Any]) -> None:
         self.payload = payload
