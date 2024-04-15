@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from handler.configured_handler import ConfiguredHandler
 from handler.introspect import get_handler_paths
 from util import log
@@ -9,6 +10,8 @@ async def main() -> int:
     l = log.get_logger("main")
     l.info("starting up")
 
+    sys.path.append("handlers")
+    
     # load the handlers
     handler_paths = get_handler_paths()
     configured_handlers: list[ConfiguredHandler] = []
@@ -25,4 +28,4 @@ async def main() -> int:
     return exit_code
 
 if __name__ == "__main__":
-    exit(asyncio.run(main()))
+    sys.exit(asyncio.run(main()))

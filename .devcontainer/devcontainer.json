@@ -1,7 +1,14 @@
 {
 	"name": "Python",
-	"image": "mcr.microsoft.com/devcontainers/python:dev-bookworm",
+	"image": "mcr.microsoft.com/devcontainers/python:3.11-bookworm",
 	"features": {
+		"ghcr.io/devcontainers-contrib/features/apt-get-packages": {
+			"packages": "patchelf,ccache"
+		},
+		"ghcr.io/devcontainers/features/docker-in-docker": "latest"
+	},
+	"containerEnv": {
+		"IMAGE_TAG": "webhookpollutil"
 	},
 	"customizations": {
 		"vscode": {
@@ -22,7 +29,8 @@
 			"extensions": [
 				"njpwerner.autodocstring",
 				"KevinRose.vsc-python-indent",
-				"ms-python.black-formatter"
+				"ms-python.black-formatter",
+				"ms-vscode.makefile-tools"
 			]
 		}
 	}
