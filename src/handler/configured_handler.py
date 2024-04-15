@@ -24,12 +24,14 @@ class ConfiguredHandler:
     _build_webhook_payload_context: Callable[[], Coroutine[None, None, JsonWebhookPayloadContext]]
     _last_poll: datetime.datetime | None
     _last_poll_response_context: PollResponseContext | None
+    _webhook_sent: bool
 
     def __init__(self, name: str, path: Path, log: logging.Logger) -> None:
         self._name = name
         self._path = path
         self._log = log
         self._last_poll = None
+        self._webhook_sent = False
 
     @classmethod
     def build(cls, path: Path) -> "ConfiguredHandler":
@@ -97,12 +99,21 @@ class ConfiguredHandler:
         Args:
             poll_response (PollResponseContext): _description_
         """
+        # check if the service is healthy. we should get None as the payload if it is.
         request_payload: JsonWebhookPayloadContext | None = await self._build_webhook_payload_context(self._last_poll_response_context)  # type: ignore <-- todo remove
-        if not request_payload:
+        if request_payload is None:
+            self._webhook_sent = False
             return
-        
-        async with httpx.AsyncClient() as c:
-            await c.post(url=self._webhook_url, json=request_payload.payload) # type: ignore
+
+        # if a webhook hasn't been sent for this event, send
+        if self._webhook_sent is False:
+            self._log.info("triggering")
+            async with httpx.AsyncClient() as c:
+                response = await c.post(url=self._webhook_url, json=request_payload.payload) # type: ignore
+                if response.status_code != 200:
+                    self._log.error(f"webhook responded with status code {response.status_code}, not 200")
+                    return
+                self._webhook_sent = True
 
     def needs_polling(self) -> bool:
         """If this handler is ready for polling again. This checks for if
